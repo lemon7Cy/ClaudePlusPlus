@@ -1,0 +1,16 @@
+{
+  "name": "claude-plus-plus",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-based local developer console launcher for the official Claude desktop app",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs --open",
+    "dev": "node --watch server.mjs --open",
+    "check": "node --check server.mjs && node --check public/app.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}

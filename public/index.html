@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Claude++ Web Console</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+    <main class="shell">
+      <header class="hero">
+        <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+        <div class="hero-copy">
+          <p class="eyebrow">LOCAL DEVELOPER WORKBENCH</p>
+          <h1>Claude<span>++</span></h1>
+          <p class="subtitle">在浏览器里启动、配置并观察官方 Claude Desktop。</p>
+        </div>
+        <div class="hero-status">
+          <span id="platformBadge" class="badge neutral">检测中</span>
+          <span id="runningBadge" class="badge neutral">Claude 未知</span>
+        </div>
+      </header>
+
+      <section id="errorPanel" class="notice error hidden" role="alert"></section>
+
+      <section class="overview-grid">
+        <article class="panel identity-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="kicker">INSTALLATION</p>
+              <h2>客户端状态</h2>
+            </div>
+            <button class="icon-button" data-action="refresh" title="刷新状态" aria-label="刷新状态">↻</button>
+          </div>
+          <dl class="facts">
+            <div><dt>版本</dt><dd id="versionValue">—</dd></div>
+            <div><dt>安装位置</dt><dd id="installValue">—</dd></div>
+            <div><dt>Developer Mode</dt><dd id="developerModeValue">—</dd></div>
+            <div><dt>配置文件</dt><dd id="configValue">—</dd></div>
+          </dl>
+        </article>
+
+        <article class="panel action-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="kicker">QUICK ACTIONS</p>
+              <h2>启动与控制台</h2>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="action primary" data-action="enable-restart">
+              <strong>启用并打开 DevTools</strong>
+              <span>写入官方配置、重启 Claude、调用快捷键</span>
+            </button>
+            <button class="action" data-action="launch">
+              <strong>启动 / 唤醒 Claude</strong>
+              <span>保留当前 Developer Mode 状态</span>
+            </button>
+            <button class="action" data-action="open-devtools">
+              <strong>打开或聚焦 DevTools</strong>
+              <span id="shortcutText">Ctrl + Alt + I</span>
+            </button>
+            <button class="action quiet" data-action="show-config">
+              <strong>查看配置文件</strong>
+              <span>打开 developer_settings.json 所在位置</span>
+            </button>
+            <button class="action danger" data-action="disable">
+              <strong>关闭 Developer Mode</strong>
+              <span>重启 Claude 后完全生效</span>
+            </button>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel boundary-panel">
+        <div class="boundary-icon">i</div>
+        <div>
+          <h2>为什么这里没有浏览器 inspector URL？</h2>
+          <p>Claude 的内置 Developer Mode 不需要 token，可以打开完整的 Elements、Console、Sources、Network；但外部 CDP 端口需要 Anthropic 签名授权。因此浏览器页面负责控制与诊断，真正的 DevTools 由 Claude 官方独立窗口承载。</p>
+        </div>
+      </section>
+
+      <section class="panel study-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="kicker">INTERACTION STUDY</p>
+            <h2>建议观察路径</h2>
+          </div>
+        </div>
+        <div class="study-grid">
+          <article><span>01</span><h3>Console</h3><p>前端事件、IPC 错误、功能开关和状态流。</p></article>
+          <article><span>02</span><h3>Network</h3><p>Claude API、SSE、MCP 与附件请求时序。</p></article>
+          <article><span>03</span><h3>Sources</h3><p>搜索 UI 文案、命令名称与交互入口。</p></article>
+          <article><span>04</span><h3>Elements</h3><p>检查 Cowork / Code 页面的 DOM 与可访问性。</p></article>
+        </div>
+      </section>
+
+      <section class="panel log-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="kicker">ACTIVITY</p>
+            <h2>运行日志</h2>
+          </div>
+          <span id="busyIndicator" class="busy hidden">处理中…</span>
+        </div>
+        <div id="logList" class="log-list" aria-live="polite"></div>
+      </section>
+
+      <footer>
+        <span>Claude++ Web Console · 仅监听 127.0.0.1</span>
+        <a href="https://github.com/lemon7Cy/ClaudePlusPlus" target="_blank" rel="noreferrer">GitHub</a>
+      </footer>
+    </main>
+    <div id="toast" class="toast hidden" role="status"></div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
