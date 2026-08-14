@@ -1,91 +1,69 @@
 # Claude++
 
-Claude++ 是一个在本地浏览器中运行的 Claude Desktop 开发者控制面板。它可以识别官方客户端、启用官方 Developer Mode、启动或重启 Claude，并打开独立 DevTools 窗口。
+Claude++ 是面向官方 Claude Desktop 的 clean-room 开发者启动器。它使用 Claude 官方 `developer_settings.json` 开关启用 Developer Mode，并打开完整的 Electron DevTools。
 
-项目只监听 `127.0.0.1`，不修改 `app.asar`，不绕过 Anthropic 的调试授权。
+DevTools 包含：
 
-## 快速开始
+- Elements
+- Console
+- Sources
+- Network
+- Performance
+- Application
 
-### Windows
+## Windows 使用
 
-需要 [Node.js 20+](https://nodejs.org/)和 Microsoft Store / MSIX 版 Claude Desktop。
+需要 Microsoft Store / MSIX 版 Claude Desktop 和 .NET 9 Desktop Runtime。
 
-1. 双击 `Start-ClaudePlusPlus-Web.cmd`。
-2. 默认浏览器会自动打开 `http://127.0.0.1:9344`。
-3. 点击“启用并打开 DevTools”，或在 Claude 中按 `Ctrl+Alt+I`。
+1. 运行 `ClaudePlusPlus.exe`。
+2. 点击“启用并重启”。
+3. Claude 重启后会打开独立 DevTools 窗口。
+4. 之后可在 Claude 中按 `Ctrl+Alt+I` 打开或聚焦 DevTools。
 
-### macOS
+## 为什么不是浏览器 URL
 
-需要 Node.js 20+ 和安装在 `/Applications` 或 `~/Applications` 的 `Claude.app`。
+Codex++ 可以启动 Codex App 时附加：
 
-```bash
-./start.command
+```text
+--remote-debugging-port=9229
 ```
 
-也可以运行：
+然后使用 Chromium 自带的：
 
-```bash
-npm start
+```text
+http://127.0.0.1:9229/devtools/inspector.html?ws=...
 ```
 
-首次让 Claude++ 自动发送 `Cmd+Option+I` 时，macOS 可能会要求给终端或 Node 开启“辅助功能”权限。未授权时，仍可以在 Claude 窗口内手动按快捷键。
+Claude Desktop `1.30096.1` 对 `remote-debugging-port` 和 `remote-debugging-pipe` 增加了 `CLAUDE_CDP_AUTH` 签名校验。授权数据包含短时效时间戳、用户数据目录和 Anthropic Ed25519 签名。
 
-## 页面能力
+本项目不包含 Anthropic 私钥，也不修改 `app.asar`、伪造授权或绕过签名。因此无法在普通浏览器中生成与 Codex++ 相同的 inspector URL。
 
-- 检测 Claude 版本、安装位置和运行状态。
-- 读取和更新官方 `developer_settings.json`，保留其他已有字段。
-- 启动、唤醒或重启官方 Claude Desktop。
-- 打开或聚焦 Claude 内置 DevTools。
-- 显示本地操作日志和调试边界。
-- 重复启动时复用已运行的本地服务，不会再启一个实例。
+Claude 官方内置 DevTools 使用 Electron 内部调试通道，不需要外部 CDP token，并能完整查看源码、DOM、网络请求和运行时事件。
 
-## 调试边界
+## 适合的调研方式
 
-Claude Desktop 有两种不同的调试入口：
+- 在 Sources 中使用 `Ctrl+Shift+F` 搜索 UI 文案、IPC 命令和功能开关。
+- 对压缩 JavaScript 使用 Pretty print（`{}`）后下断点。
+- 在 Network 中开启 Preserve log，观察 Claude API、SSE、MCP 和附件请求。
+- 在 Console 中观察前端事件、IPC 报错和功能开关。
+- 在 Elements 中检查 Cowork / Code 页面的 DOM、样式和可访问性。
 
-1. **内置 DevTools**：由 `developer_settings.json` 中的 `allowDevTools` 控制，无需 token。Claude++ 使用的是这个官方入口。
-2. **外部 CDP 端口**：Claude `1.30096.1` 会验证短时效 Anthropic 签名。本项目不包含 Anthropic 私钥，也不伪造、破解或绕过该签名。
-
-因此，浏览器页面是启动和诊断面板；完整的 Elements、Console、Sources 和 Network 由 Claude 官方独立 DevTools 窗口提供。它不会生成 CodexPlusPlus 那种外部 inspector URL。
-
-## 本地开发
-
-浏览器版只使用 Node.js 内置模块，没有 npm 运行时依赖：
-
-```bash
-npm run check
-npm run dev
-```
-
-默认端口是 `9344`。如需更换：
-
-```powershell
-$env:CLAUDE_PLUS_PLUS_PORT=9444
-npm start
-```
-
-```bash
-CLAUDE_PLUS_PLUS_PORT=9444 npm start
-```
-
-## Windows 桌面版
-
-仓库仍保留原生 WinForms 启动器，作为 Windows 备用入口。构建需要 .NET 9 SDK：
+## 构建
 
 ```powershell
 dotnet build -c Release
 dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o publish
 ```
 
-## 安全设计
+输出：`publish\ClaudePlusPlus.exe`
 
-- HTTP 服务只绑定 `127.0.0.1`。
-- 写操作需要运行时随机 session token，不开放 CORS。
-- Windows 上只会停止安装路径精确匹配的 Claude 进程。
-- 不修改 Claude 安装目录，不注入 DLL 或替换官方资源。
+## 安全边界
 
-## 许可证
+- 不修改或替换官方 `app.asar`。
+- 不向 Claude 安装目录写入 DLL 或脚本。
+- 只会重启执行路径与已检测 Claude 安装精确匹配的进程。
+- 保留 `developer_settings.json` 中的其他现有字段。
+
+## License
 
 [MIT](LICENSE)
-
-本项目是 clean-room 实现，只参考了“外部启动器 + 调试面板”的通用产品形态，没有复制 CodexPlusPlus 源码或注入脚本。
