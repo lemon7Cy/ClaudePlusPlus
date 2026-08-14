@@ -15,17 +15,24 @@ internal sealed class MainForm : Form
     private readonly Button _enableButton = new();
     private readonly Button _disableButton = new();
     private readonly Button _openDevToolsButton = new();
+    private readonly Button _launchCdpButton = new();
+    private readonly Button _openCdpButton = new();
+    private readonly Button _copyCdpUrlButton = new();
+    private readonly TextBox _cdpUrlTextBox = new();
+    private readonly Label _cdpStatusValue = CreateValueLabel();
     private readonly TextBox _logTextBox = new();
 
     private ClaudeInstallation? _installation;
+    private AsarInspection? _asarInspection;
+    private ClaudeCdpTarget? _cdpTarget;
     private bool _developerModeEnabled;
     private bool _busy;
 
     public MainForm()
     {
         Text = "Claude++ · Claude Developer Console";
-        MinimumSize = new Size(940, 660);
-        Size = new Size(1080, 740);
+        MinimumSize = new Size(980, 760);
+        Size = new Size(1120, 860);
         StartPosition = FormStartPosition.CenterScreen;
         BackColor = Color.FromArgb(247, 246, 243);
         Font = new Font("Segoe UI", 9.5f);
@@ -53,7 +60,7 @@ internal sealed class MainForm : Form
         });
         header.Controls.Add(new Label
         {
-            Text = "启用 Claude 官方内置 Developer Mode，无需 CDP token",
+            Text = "官方内置 DevTools + 实验性真实浏览器 CDP",
             ForeColor = Color.FromArgb(205, 202, 197),
             AutoSize = true,
             Location = new Point(25, 52)
@@ -65,9 +72,10 @@ internal sealed class MainForm : Form
             Dock = DockStyle.Fill,
             Padding = new Padding(18),
             ColumnCount = 1,
-            RowCount = 4
+            RowCount = 5
         };
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 126));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 138));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 138));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 186));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -76,8 +84,9 @@ internal sealed class MainForm : Form
 
         root.Controls.Add(BuildInstallationPanel(), 0, 0);
         root.Controls.Add(BuildControlPanel(), 0, 1);
-        root.Controls.Add(BuildGuidePanel(), 0, 2);
-        root.Controls.Add(BuildLogPanel(), 0, 3);
+        root.Controls.Add(BuildCdpPanel(), 0, 2);
+        root.Controls.Add(BuildGuidePanel(), 0, 3);
+        root.Controls.Add(BuildLogPanel(), 0, 4);
     }
 
     private Control BuildInstallationPanel()
@@ -172,6 +181,55 @@ internal sealed class MainForm : Form
         return panel;
     }
 
+    private Control BuildCdpPanel()
+    {
+        var panel = CreateCard();
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            Padding = new Padding(16, 10, 16, 10),
+            ColumnCount = 5,
+            RowCount = 2
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 98));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 168));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 138));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 128));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+
+        layout.Controls.Add(CreateCaptionLabel("浏览器 CDP"), 0, 0);
+        _cdpUrlTextBox.Dock = DockStyle.Fill;
+        _cdpUrlTextBox.ReadOnly = true;
+        _cdpUrlTextBox.BackColor = Color.White;
+        _cdpUrlTextBox.Margin = new Padding(0, 8, 8, 7);
+        layout.Controls.Add(_cdpUrlTextBox, 1, 0);
+
+        _launchCdpButton.Text = "准备并启动 CDP";
+        StyleButton(_launchCdpButton, primary: true);
+        _launchCdpButton.Click += async (_, _) => await LaunchCdpAsync();
+        layout.Controls.Add(_launchCdpButton, 2, 0);
+
+        _openCdpButton.Text = "浏览器打开";
+        StyleButton(_openCdpButton, primary: true);
+        _openCdpButton.Click += (_, _) => OpenCdpInspector();
+        layout.Controls.Add(_openCdpButton, 3, 0);
+
+        _copyCdpUrlButton.Text = "复制网址";
+        StyleButton(_copyCdpUrlButton, primary: false);
+        _copyCdpUrlButton.Click += (_, _) => CopyCdpUrl();
+        layout.Controls.Add(_copyCdpUrlButton, 4, 0);
+
+        layout.Controls.Add(CreateCaptionLabel("实验状态"), 0, 1);
+        _cdpStatusValue.Text = "等待检测 Claude 版本";
+        layout.Controls.Add(_cdpStatusValue, 1, 1);
+        layout.SetColumnSpan(_cdpStatusValue, 4);
+
+        panel.Controls.Add(layout);
+        return panel;
+    }
+
     private static Control BuildGuidePanel()
     {
         var panel = CreateCard();
@@ -251,11 +309,17 @@ internal sealed class MainForm : Form
             Log($"检测到 {_installation.PackageFullName}");
             Log($"安装目录：{_installation.InstallLocation}");
 
-            var inspection = await Task.Run(() => AsarInspector.Inspect(_installation.AsarPath));
-            _versionValue.Text = $"{_installation.Version}（应用 {inspection.ProductVersion}）";
-            _protectionValue.Text = inspection.RequiresSignedCdpToken
+            _asarInspection = await Task.Run(() => AsarInspector.Inspect(_installation.AsarPath));
+            _versionValue.Text = $"{_installation.Version}（应用 {_asarInspection.ProductVersion}）";
+            _protectionValue.Text = _asarInspection.RequiresSignedCdpToken
                 ? "内置 DevTools 可用；外部 CDP 需签名"
                 : "版本行为可能已变化";
+            _cdpStatusValue.Text = ClaudeCdpRuntimeService.Supports(_asarInspection.ProductVersion)
+                ? "当前版本已验证；首次准备需要复制约 630 MB，使用独立资料目录"
+                : $"Claude {_asarInspection.ProductVersion} 尚无已验证的外部 CDP 补丁";
+            _cdpStatusValue.ForeColor = ClaudeCdpRuntimeService.Supports(_asarInspection.ProductVersion)
+                ? Color.FromArgb(53, 118, 78)
+                : Color.FromArgb(174, 52, 52);
 
             _developerModeEnabled = DeveloperModeService.IsEnabled(_installation.UserDataPath);
             SetStatus(
@@ -390,6 +454,81 @@ internal sealed class MainForm : Form
         });
     }
 
+    private async Task LaunchCdpAsync()
+    {
+        if (_installation is null || _asarInspection is null)
+        {
+            return;
+        }
+
+        if (!ClaudeCdpRuntimeService.Supports(_asarInspection.ProductVersion))
+        {
+            MessageBox.Show(
+                this,
+                $"Claude {_asarInspection.ProductVersion} 尚无经过验证的补丁。为避免更新后盲目修改，本工具会拒绝继续。",
+                "版本不受支持",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+            return;
+        }
+
+        var runtimeDirectory = Path.Combine(
+            ClaudeCdpRuntimeService.RuntimeBasePath,
+            _asarInspection.ProductVersion);
+        if (!Directory.Exists(runtimeDirectory) && MessageBox.Show(
+                this,
+                "实验性浏览器 CDP 会把当前 Claude 复制到用户目录（约 630 MB），只修改副本，并使用独立登录资料目录。" +
+                Environment.NewLine + Environment.NewLine +
+                "副本没有原 Microsoft Store 包身份，少数只允许 MSIX 的 Cowork 功能可能不可用；完整功能仍可使用上方官方内置 DevTools。" +
+                Environment.NewLine + Environment.NewLine +
+                "是否继续？",
+                "准备 Claude CDP 副本",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning) != DialogResult.Yes)
+        {
+            return;
+        }
+
+        await RunBusyAsync(async () =>
+        {
+            var progress = new Progress<string>(Log);
+            var runtime = await ClaudeCdpRuntimeService.PrepareAsync(_installation, progress);
+            _cdpTarget = await ClaudeCdpLaunchService.LaunchAsync(runtime, progress: progress);
+            _cdpUrlTextBox.Text = _cdpTarget.InspectorUrl;
+            _cdpStatusValue.Text =
+                $"已连接真实 Claude target {_cdpTarget.Id} · 端口 {_cdpTarget.Port}" +
+                (_cdpTarget.ReusedExistingProcess ? "（复用现有进程）" : string.Empty);
+            _cdpStatusValue.ForeColor = Color.FromArgb(53, 118, 78);
+            SetStatus("Claude 浏览器 CDP 已就绪", Color.FromArgb(53, 118, 78));
+            Log($"真实页面：{_cdpTarget.Url}");
+            Log($"WebSocket：{_cdpTarget.WebSocketDebuggerUrl}");
+            Log($"Inspector：{_cdpTarget.InspectorUrl}");
+            ClaudeCdpLaunchService.OpenInspector(_cdpTarget);
+        });
+    }
+
+    private void OpenCdpInspector()
+    {
+        if (_cdpTarget is null)
+        {
+            return;
+        }
+
+        ClaudeCdpLaunchService.OpenInspector(_cdpTarget);
+        Log("已在默认浏览器打开 Claude DevTools inspector。");
+    }
+
+    private void CopyCdpUrl()
+    {
+        if (_cdpTarget is null)
+        {
+            return;
+        }
+
+        Clipboard.SetText(_cdpTarget.InspectorUrl);
+        Log("已复制 Claude DevTools inspector 地址。");
+    }
+
     private static async Task WaitForMainWindowAsync(string executablePath, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
@@ -452,6 +591,11 @@ internal sealed class MainForm : Form
         _enableButton.Enabled = ready;
         _disableButton.Enabled = ready && _developerModeEnabled;
         _openDevToolsButton.Enabled = ready && _developerModeEnabled;
+        _launchCdpButton.Enabled = ready &&
+                                   _asarInspection is not null &&
+                                   ClaudeCdpRuntimeService.Supports(_asarInspection.ProductVersion);
+        _openCdpButton.Enabled = ready && _cdpTarget is not null;
+        _copyCdpUrlButton.Enabled = ready && _cdpTarget is not null;
     }
 
     private void SetStatus(string text, Color color)
