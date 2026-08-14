@@ -247,9 +247,32 @@ if (-not $targets) {
     throw "CDP did not become ready on port $Port within 30 seconds."
 }
 
-$target = $targets | Where-Object { $_.type -eq 'page' -and $_.webSocketDebuggerUrl } | Select-Object -First 1
+$runtimeUriPrefix = ([Uri]([IO.Path]::GetFullPath($runtimeDirectory).TrimEnd('\') + '\')).AbsoluteUri
+$shellTarget = $targets | Where-Object {
+    $_.type -eq 'page' -and
+    $_.url.StartsWith($runtimeUriPrefix, [StringComparison]::OrdinalIgnoreCase) -and
+    $_.url.Contains('main_window/index.html')
+} | Select-Object -First 1
+if ($null -eq $shellTarget) {
+    throw 'CDP responded, but the Claude shell target was not found.'
+}
+
+$claudeTargets = @($targets | Where-Object {
+    if ($_.type -ne 'page') { return $false }
+    $uri = $null
+    if (-not [Uri]::TryCreate($_.url, [UriKind]::Absolute, [ref]$uri)) { return $false }
+    return ($uri.Scheme -eq 'https' -or $uri.Scheme -eq 'http') -and
+        ($uri.Host -eq 'claude.ai' -or $uri.Host.EndsWith('.claude.ai') -or
+         $uri.Host -eq 'claude.com' -or $uri.Host.EndsWith('.claude.com'))
+})
+$target = $claudeTargets | Where-Object {
+    -not $_.url.Contains('/login') -and -not $_.title.Contains('Sign in')
+} | Select-Object -First 1
 if ($null -eq $target) {
-    throw 'CDP responded, but no page target was available.'
+    $target = $claudeTargets | Select-Object -First 1
+}
+if ($null -eq $target) {
+    $target = $shellTarget
 }
 
 $webSocketUri = [Uri]$target.webSocketDebuggerUrl

@@ -21,6 +21,8 @@ http://127.0.0.1:9344/devtools/inspector.html?ws=127.0.0.1:9344/devtools/page/<t
 file:///.../resources/app.asar/.vite/renderer/main_window/index.html
 ```
 
+启动器会先用这个本地 shell target 确认调试端口确实属于 Claude 副本，再优先选择 `https://claude.ai/...` 或 `https://claude.com/...` 的真实内容 target，避免打开只有空 `#root` 的 Electron 外壳。
+
 ## Windows 使用
 
 需要 Microsoft Store / MSIX 版 Claude Desktop 和 .NET 9 Desktop Runtime。

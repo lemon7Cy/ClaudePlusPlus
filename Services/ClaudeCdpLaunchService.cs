@@ -103,14 +103,27 @@ internal static class ClaudeCdpLaunchService
 
             var runtimeUriPrefix = new Uri(runtime.RuntimeDirectory.TrimEnd(Path.DirectorySeparatorChar) +
                                            Path.DirectorySeparatorChar).AbsoluteUri;
-            var target = targets.FirstOrDefault(candidate =>
-                             candidate.Type == "page" &&
-                             candidate.Url.StartsWith(runtimeUriPrefix, StringComparison.OrdinalIgnoreCase) &&
-                             candidate.Url.Contains("main_window/index.html", StringComparison.OrdinalIgnoreCase))
-                         ?? targets.FirstOrDefault(candidate =>
-                             candidate.Type == "page" &&
-                             candidate.Url.StartsWith(runtimeUriPrefix, StringComparison.OrdinalIgnoreCase));
-            if (target is null || string.IsNullOrWhiteSpace(target.WebSocketDebuggerUrl))
+            var shellTarget = targets.FirstOrDefault(candidate =>
+                                  candidate.Type == "page" &&
+                                  candidate.Url.StartsWith(runtimeUriPrefix, StringComparison.OrdinalIgnoreCase) &&
+                                  candidate.Url.Contains("main_window/index.html", StringComparison.OrdinalIgnoreCase))
+                              ?? targets.FirstOrDefault(candidate =>
+                                  candidate.Type == "page" &&
+                                  candidate.Url.StartsWith(runtimeUriPrefix, StringComparison.OrdinalIgnoreCase));
+            if (shellTarget is null)
+            {
+                return null;
+            }
+
+            var claudeTargets = targets
+                .Where(IsClaudeContentTarget)
+                .ToList();
+            var target = claudeTargets.FirstOrDefault(candidate =>
+                             !candidate.Url.Contains("/login", StringComparison.OrdinalIgnoreCase) &&
+                             !candidate.Title.Contains("sign in", StringComparison.OrdinalIgnoreCase))
+                         ?? claudeTargets.FirstOrDefault()
+                         ?? shellTarget;
+            if (string.IsNullOrWhiteSpace(target.WebSocketDebuggerUrl))
             {
                 return null;
             }
@@ -132,6 +145,20 @@ internal static class ClaudeCdpLaunchService
         {
             return null;
         }
+    }
+
+    private static bool IsClaudeContentTarget(CdpTargetPayload candidate)
+    {
+        if (candidate.Type != "page" || !Uri.TryCreate(candidate.Url, UriKind.Absolute, out var uri))
+        {
+            return false;
+        }
+
+        return (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp) &&
+               (uri.Host.Equals("claude.ai", StringComparison.OrdinalIgnoreCase) ||
+                uri.Host.EndsWith(".claude.ai", StringComparison.OrdinalIgnoreCase) ||
+                uri.Host.Equals("claude.com", StringComparison.OrdinalIgnoreCase) ||
+                uri.Host.EndsWith(".claude.com", StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool IsPortAvailable(int port)
